@@ -1486,7 +1486,7 @@ font-family:Cairo;
   <div class="form-group">
     <label><i class="fas fa-file-alt"></i>اسم التقرير</label>
     
-   <!-- التصنيف العام -->
+    <!-- التصنيف العام -->
     <select id="reportCategory" oninput="handleReportCategory()" style="margin-bottom:10px;">
         <option value="">اختر تصنيف التقرير</option>
         <option value="التقارير التعليمية الصفية">أولا: التقارير التعليمية الصفية</option>
@@ -1837,39 +1837,47 @@ font-family:Cairo;
 </div>
 
 <script>
+
 // ==================== وظائف التفعيل ====================
 async function activateTool() {
-    const token = document.getElementById("activationInput").value.trim();
+    const code = document.getElementById("activationInput").value.trim();
 
-    if (!token) {
+    if (!code) {
         alert("الرجاء إدخال كود التفعيل");
         return;
     }
 
     try {
         const res = await fetch("https://ksa-w073.onrender.com/activate", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ code: token })
-});
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                code: code
+            })
+        });
 
-if (!res.ok) throw new Error();
+        if (!res.ok) {
+            throw new Error("INVALID_CODE");
+        }
 
-const data = await res.json();
+        const data = await res.json();
 
-// خزّن JWT فقط
-localStorage.setItem("AI_TOKEN", data.token);
+        // حفظ التوكن النهائي
+        localStorage.setItem("AI_TOKEN", data.token);
+
+        // إخفاء شاشة التفعيل
         document.getElementById("activationScreen").style.display = "none";
-        showNotification("تم تفعيل الأداة بنجاح ✓");
 
-    } catch (e) {
-        alert("❌ كود التفعيل غير صحيح");
+        // تشغيل الأداة
+        initializeApp();
+
+    } catch (error) {
+        alert("❌ كود التفعيل غير صحيح أو منتهي");
         localStorage.removeItem("AI_TOKEN");
     }
 }
-
 // ==================== كائن التقارير ====================
 // كائن يحتوي على جميع التقارير مصنفة
 const allReportsByCategory = {
@@ -2056,7 +2064,6 @@ const allReportsByCategory = {
     "تقرير تصميم الأنشطة اللاصفية",
     "تقرير تحليل محتوى المنهج",
     "تقرير مواءمة المنهج مع نواتج التعلم",
-    "تقرير تحديث الخطط الدراسية",
     "t report تطوير أدوات التقويم",
     "تقرير البحث الإجرائي"
   ],
@@ -2080,7 +2087,8 @@ const allReportsByCategory = {
     "تقرير الإسعافات الأولية",
     "تقرير جاهزية المباني"
   ]
-}
+};
+
 // إنشاء قائمة بجميع التقارير لاستخدامها في البحث العام
 const allReports = [];
 for (const category in allReportsByCategory) {
@@ -2606,6 +2614,7 @@ async function fillWithAI() {
     const token = localStorage.getItem("AI_TOKEN");
     if (!token) {
         alert("يرجى تفعيل الأداة أولاً");
+        document.getElementById("activationScreen").style.display = "flex";
         return;
     }
     
@@ -2714,11 +2723,11 @@ ${count ? `عدد الحضور: ${count}` : ''}
 
         const data = await response.json();
 
-if (!data || !data.answer) {
-    throw new Error('فشل التوليد من السيرفر');
-}
+        if (!data || !data.answer) {
+            throw new Error('فشل التوليد من السيرفر');
+        }
 
-const aiResponse = data.answer;
+        const aiResponse = data.answer;
         parseAIResponseProfessional(aiResponse);
         showNotification('تم تعبئة الحقول باستخدام الذكاء الاصطناعي بنجاح! ✓');
         
@@ -3124,32 +3133,25 @@ function updateManualDate() {
     }
 }
 
-// عند تحميل الصفحة
-document.addEventListener("DOMContentLoaded", async () => {
-
-    const token = localStorage.getItem("AI_TOKEN");
-
-    if (token) {
-        try {
-            const res = await fetch("https://ksa-w073.onrender.com/verify", {
-    headers: { "X-Token": token }
-});
-
-            if (!res.ok) throw new Error();
-
-            document.getElementById("activationScreen").style.display = "none";
-
-        } catch {
-            localStorage.removeItem("AI_TOKEN");
-            document.getElementById("activationScreen").style.display = "flex";
-            return; // ⛔ لا تكمل تحميل التطبيق
-        }
-    } else {
-        document.getElementById("activationScreen").style.display = "flex";
-        return; // ⛔ لا تكمل تحميل التطبيق
+// دالة معالجة نوع التقرير
+function handleReportType() {
+    const reportTypeSelect = document.getElementById('reportType');
+    const reportTypeInput = document.getElementById('reportTypeInput');
+    const manualTitleInput = document.getElementById('manualReportTitle');
+    
+    if (reportTypeSelect.value) {
+        // إذا تم اختيار تقرير من القائمة
+        manualTitleInput.value = reportTypeSelect.value;
+        updateReport();
+    } else if (reportTypeInput.value) {
+        // إذا تم إدخال تقرير يدوياً
+        manualTitleInput.value = reportTypeInput.value;
+        updateReport();
     }
+}
 
-    // ✅ بعد تفعيل حقيقي فقط
+// دالة تهيئة التطبيق بعد التفعيل
+function initializeApp() {
     loadDates();
     loadTeacherData();
     updateReport();
@@ -3176,6 +3178,35 @@ document.addEventListener("DOMContentLoaded", async () => {
             setTimeout(adaptSubjectLessonFont, 100);
         }
     });
+}
+
+// عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", function() {
+    const token = localStorage.getItem("AI_TOKEN");
+    
+    if (token) {
+        // تحقق من صلاحية التوكن
+        fetch("https://ksa-w073.onrender.com/verify", {
+            headers: {
+                "X-Token": token
+            }
+        })
+        .then(res => {
+            if (res.ok) {
+                document.getElementById("activationScreen").style.display = "none";
+                initializeApp();
+            } else {
+                localStorage.removeItem("AI_TOKEN");
+                document.getElementById("activationScreen").style.display = "flex";
+            }
+        })
+        .catch(() => {
+            localStorage.removeItem("AI_TOKEN");
+            document.getElementById("activationScreen").style.display = "flex";
+        });
+    } else {
+        document.getElementById("activationScreen").style.display = "flex";
+    }
 });
 </script>
 
